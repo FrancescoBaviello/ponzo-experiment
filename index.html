@@ -321,7 +321,7 @@ input[type=range]{width:100%}
 /* ============================================================
    CORE (pure logic: no DOM) — also exercised by the test script
    ============================================================ */
-const VERSION = "3.0.0";
+const VERSION = "3.1.0";
 const CUES = [
   {key:"lines",   code:"L", label:"Slanted lines"},
   {key:"horizon", code:"H", label:"Horizon + ground lines"},
@@ -420,18 +420,20 @@ function summarize(results){
 
 /* ---------- stimulus drawing (needs a 2D context only) ---------- */
 const COL = {bg:"#d6d6d6", shadeNear:"#9e9e9e", rail:"#262626", ground:"#4d4d4d", trunk:"#4a3b2e", leaf:"#2f4a3a", bar:"#a8121a"};
-/* The texture is one fixed set of pebbles lying on the ground plane, identical in every trial. */
-const PEBBLES = (() => {
-  const rng = mulberry32(20261117), out = [];
+/* The texture: pebbles lying on the ground plane. Every screen gets its own random layout (seeded, so it can be
+   redrawn exactly); density, sizes and the depth gradient are the same every time, only the positions change. */
+function makePebbles(seed){
+  const rng = mulberry32(seed >>> 0), out = [];
   while (out.length < 48000){
     const z = 1 + rng() * 27, x = (rng() * 2 - 1) * 26, r = 0.02 + rng() * 0.02, dark = rng() < 0.55, a = 0.10 + rng() * 0.20;
     if (Math.abs(x / z) > 0.92) continue;
     out.push({s:1 / z, x, r, dark, a});
   }
   return out.sort((p, q) => p.s - q.s);   // far to near
-})();
+}
+const PEBBLES = makePebbles(20261117);    /* default layout, used only when no seed is given */
 
-function drawContext(c, u, cues){
+function drawContext(c, u, cues, pebbles){
   const W = G.W * u, H = G.H * u, cx = G.cx * u, yv = G.yVP * u, gr = (G.H - G.yVP) * u;
   c.save(); c.beginPath(); c.rect(0, 0, W, H); c.clip();
   c.fillStyle = COL.bg; c.fillRect(0, 0, W, H);
@@ -440,7 +442,7 @@ function drawContext(c, u, cues){
     c.fillStyle = g; c.fillRect(0, yv, W, H - yv);
   }
   if (cues.texture){
-    for (const p of PEBBLES){
+    for (const p of (pebbles || PEBBLES)){
       const rx = p.r * p.s * u; if (rx < 0.4) continue;
       const ry = rx * Math.max(0.3, (G.H - G.yVP) * p.s);
       c.fillStyle = (p.dark ? "rgba(0,0,0," : "rgba(255,255,255,") + p.a.toFixed(3) + ")";
@@ -501,7 +503,7 @@ const CATCH_PASS_LIMIT = 15;                 /* |final offset| at most 15% on a 
 const BS_ANGLE = 13.5, BS_REPS = 5, BS_SPEED_MM = 40;
 
 const TRIAL_COLS = ["session_id","participant_code","run_type","mode","seq","phase","trial_number","block","trial_in_block",
-  "condition_code","cue_lines","cue_horizon","cue_shade","cue_texture","cue_trees","n_cues","start_offset_pct",
+  "condition_code","cue_lines","cue_horizon","cue_shade","cue_texture","cue_trees","n_cues","texture_seed","start_offset_pct",
   "judged_same","rt_judgement_ms","final_offset_pct","adjusted","n_steps","n_reversals","rt_adjust_ms","catch_pass",
   "top_length_px","final_length_px","focus_lost","tab_hidden","window_changed","fullscreen","window_w","window_h",
   "completed_iso","batch_id","app_version"];
@@ -545,7 +547,8 @@ function buildSchedule(seed, runType){
     blk.splice(pos, 0, {phase:"catch", number:++nCatch, block:b, combo:0, start:catchStarts[b - 1]});
     blk.forEach((t, i) => { t.inBlock = i + 1; out.push(t); });
   }
-  out.forEach((t, i) => { t.seq = i + 1; });
+  const trng = mulberry32((seed ^ 0x51ED270B) >>> 0);
+  out.forEach((t, i) => { t.seq = i + 1; t.textureSeed = Math.floor(trng() * 4294967296) >>> 0; });
   return out;
 }
 
@@ -792,7 +795,9 @@ function runTrial(tr, restarted){
   setPrompt("iti"); paintScene(0, true);
   ctxCanvas = document.createElement("canvas"); ctxCanvas.width = cv.width; ctxCanvas.height = cv.height;
   const oc = ctxCanvas.getContext("2d"), k = cv.width / m.scene_w_px; oc.setTransform(k, 0, 0, k, 0, 0);
-  drawContext(oc, m.u, cuesOf(tr.combo));
+  const cues = cuesOf(tr.combo);
+  if (tr.textureSeed === undefined) tr.textureSeed = (m.seed + tr.seq * 7919) >>> 0;   /* sessions started before this version */
+  drawContext(oc, m.u, cues, cues.texture ? makePebbles(tr.textureSeed) : null);
   const mine = T;
   setTimeout(() => {
     if (T !== mine) return;
@@ -819,7 +824,7 @@ function confirmTrial(){
   const row = { session_id:ST.sessionId, participant_code:ST.code, run_type:RUN, mode:MODE, seq:tr.seq, phase:tr.phase,
     trial_number:tr.number, block:tr.block, trial_in_block:tr.inBlock, condition_code:codeOf(tr.combo),
     cue_lines:+q.lines, cue_horizon:+q.horizon, cue_shade:+q.shade, cue_texture:+q.texture, cue_trees:+q.trees,
-    n_cues:CUES.reduce((n, c) => n + (q[c.key] ? 1 : 0), 0), start_offset_pct:tr.start, judged_same:T.same,
+    n_cues:CUES.reduce((n, c) => n + (q[c.key] ? 1 : 0), 0), texture_seed:tr.textureSeed, start_offset_pct:tr.start, judged_same:T.same,
     rt_judgement_ms:Math.round(T.rtJ), final_offset_pct:fin, adjusted:fin !== tr.start ? 1 : 0, n_steps:T.nSteps,
     n_reversals:T.nRev, rt_adjust_ms:Math.round(now - T.adjOn),
     catch_pass:tr.phase === "catch" ? ((T.same === 0 && Math.abs(fin) <= CATCH_PASS_LIMIT) ? 1 : 0) : "",
@@ -944,7 +949,6 @@ function init(){
     if (ST.stage === "post") openPost(); else { ST.gateAt = -1; setTimeout(() => openGate("resume"), 300); }
   });
 
-  if (!CFG.collectionOpen){ blocked("This study has closed", "Data collection has ended. Thank you for your interest!"); return; }
   const touchOnly = window.matchMedia && matchMedia("(pointer: coarse)").matches && !matchMedia("(pointer: fine)").matches;
   if (touchOnly || Math.max(screen.width, screen.height) < 900){
     blocked("Please use a computer", "This study needs a laptop or desktop computer with a keyboard and a larger screen. Please open this link there. Thank you!"); return;
@@ -958,6 +962,7 @@ function init(){
       show("sResume"); pump(); return;
     }
   }
+  if (!CFG.collectionOpen){ blocked("This study has closed", "Data collection has ended. Thank you for your interest!"); return; }
   if (MODE === "online"){
     const done = store.get(DONE_KEY);
     if (done && done.code){ blocked("You have already taken part", "This browser has already completed the study. Each person can take part only once. Thank you!", done.code); return; }

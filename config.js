@@ -4,15 +4,15 @@ window.PONZO_CONFIG = {
 
   // 1. The web-app address from Apps Script (Deploy > Manage deployments). It ends in /exec.
   //    While this still says PASTE..., the page runs in test mode and sends nothing.
-  endpoint: "PASTE_YOUR_WEB_APP_URL_HERE",
+  endpoint: "https://script.google.com/macros/s/AKfycbxha9SPFWSZnBpolWL3OYH_Im8mhwigeXPwf_e1wGMcv7Dqegw_lf08iuQ_gCzPksCa/exec",
 
   // 2. The same word you wrote as STUDY_TOKEN in Code.gs.
-  token: "CHANGE-ME-ponzo-2026",
+  token: "Advanced_Ponzo_Token",
 
   // 3. What participants see on the first page.
   title: "Comparing line lengths",                 // neutral on purpose: don't name the illusion before the task
-  researchers: "Write your group members' names",
-  contactEmail: "your.email@example.com",          // for questions and data-deletion requests
+  researchers: "Baviello Francesco, #TODO: Add the others",
+  contactEmail: "Francibav@g.ecc.u-tokyo.ac.jp",          // for questions and data-deletion requests
   durationText: "about 25 minutes",
 
   // 4. Set to false to close the study (new visitors see "This study has closed").

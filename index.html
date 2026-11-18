@@ -1,0 +1,970 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<link rel="icon" href="data:,">
+<title>Comparing line lengths</title>
+<script src="config.js"></script>
+<style>
+:root{
+  /* Layout: participant pages are one centred sheet on the stimulus grey; the stimulus stage is a
+     single centred scene. One light theme on purpose: luminance must not change between screens. */
+  color-scheme: light;
+  --stage:#d6d6d6;
+  --paper:#f3f3f1;
+  --ink:#1c1e20;
+  --muted:#565a5f;
+  --rule:#b4b6b8;
+  --bar:#a8121a;
+  --ok:#1d6b41;
+  --warn:#8a4b00;
+  --font-body:"Helvetica Neue",Helvetica,Arial,system-ui,sans-serif;
+  --font-mono:ui-monospace,"SF Mono",Menlo,Consolas,monospace;
+}
+*{box-sizing:border-box}
+html,body{height:100%;margin:0}
+body{background:var(--stage);color:var(--ink);font:16px/1.55 var(--font-body)}
+[hidden]{display:none !important}
+h1{font-size:26px;line-height:1.2;margin:0;letter-spacing:-.01em;text-wrap:balance}
+h2{font-size:13px;text-transform:uppercase;letter-spacing:.09em;margin:6px 0 0;color:var(--muted);font-weight:600}
+p{margin:0;max-width:66ch}
+a{color:var(--ink)}
+button{font:inherit;color:var(--ink);background:#fff;border:1px solid var(--ink);border-radius:3px;padding:8px 16px;cursor:pointer}
+button:hover{background:#e9e9e7}
+button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible,a:focus-visible{outline:3px solid var(--bar);outline-offset:2px}
+button.primary{background:var(--ink);color:#fff}
+button.primary:hover{background:#000}
+button:disabled{opacity:.4;cursor:not-allowed}
+button.link{border:none;background:none;padding:0;text-decoration:underline;color:var(--muted);font-size:14px}
+kbd{font:600 13px var(--font-mono);border:1px solid var(--ink);border-bottom-width:2px;border-radius:3px;padding:1px 7px;background:#fff;white-space:nowrap}
+.mono{font-family:var(--font-mono);font-variant-numeric:tabular-nums}
+.muted{color:var(--muted)}
+.small{font-size:14px}
+.ok{color:var(--ok);font-weight:600}
+.warn{color:var(--warn);font-weight:600}
+.row{display:flex;flex-wrap:wrap;gap:10px;align-items:center}
+
+.page{min-height:100%;display:flex;align-items:center;justify-content:center;padding:28px 20px}
+.leaf{background:var(--paper);border:1px solid var(--rule);border-radius:4px;padding:30px 32px;max-width:700px;width:100%;display:flex;flex-direction:column;gap:14px}
+.leaf.wide{max-width:none;width:100%}
+.leaf ol,.leaf ul{margin:0;padding-left:22px;display:flex;flex-direction:column;gap:7px;max-width:64ch}
+.check{display:flex;gap:10px;align-items:flex-start}
+.check input{margin-top:5px}
+fieldset{border:none;margin:0;padding:0;display:flex;flex-direction:column;gap:6px}
+legend{font-weight:600;padding:0;margin-bottom:4px}
+.opts{display:flex;flex-wrap:wrap;gap:6px 18px}
+.opts label{display:flex;gap:7px;align-items:center}
+.field{display:flex;flex-direction:column;gap:5px;font-weight:600}
+.field input,.field select,.field textarea{font:16px var(--font-body);font-weight:400;color:var(--ink);background:#fff;border:1px solid var(--rule);border-radius:3px;padding:7px 9px;max-width:420px}
+.field textarea{max-width:none;min-height:70px}
+.scale{display:flex;gap:6px;flex-wrap:wrap}
+.scale label{display:flex;flex-direction:column;align-items:center;gap:2px;min-width:52px;font-size:14px}
+.formmsg{color:var(--warn);font-weight:600;min-height:1.4em}
+.banner{position:fixed;left:0;right:0;top:0;z-index:5;background:var(--warn);color:#fff;font-size:13px;padding:4px 12px;text-align:center}
+
+/* calibration */
+.cardbox{background:#fff;border:1px dashed var(--rule);padding:12px;overflow-x:auto}
+#card{background:var(--ink);border-radius:10px;color:#fff;font:12px var(--font-mono);display:flex;align-items:flex-end;padding:8px}
+input[type=range]{width:100%}
+
+/* blind-spot test */
+#bsArea{position:relative;height:150px;background:#fff;border:1px solid var(--rule);border-radius:3px;overflow:hidden}
+#bsSquare{position:absolute;top:50%;transform:translateY(-50%);background:#000}
+#bsBall{position:absolute;top:50%;transform:translateY(-50%);background:#c4161c;border-radius:50%}
+.dots{display:flex;gap:6px}
+.dots span{width:12px;height:12px;border-radius:50%;border:1px solid var(--ink)}
+.dots span.on{background:var(--ink)}
+.code{font:600 22px var(--font-mono);letter-spacing:.06em;background:#fff;border:1px solid var(--rule);border-radius:3px;padding:6px 12px;display:inline-block}
+
+/* stimulus stage */
+#stage{height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;position:relative;padding:8px 16px;user-select:none;-webkit-user-select:none}
+#scene{display:block;flex:none}
+#prompt{height:92px;flex:none;display:flex;flex-direction:column;align-items:center;gap:10px;text-align:center}
+#promptText{font-size:17px;margin:0;max-width:none}
+#counter{position:absolute;top:10px;right:16px;font:12px var(--font-mono);color:var(--muted)}
+#fitwarn{position:absolute;inset:0;background:var(--stage);display:flex;flex-direction:column;gap:12px;align-items:center;justify-content:center;text-align:center;padding:24px}
+@media (prefers-reduced-motion:reduce){*{transition:none !important;animation:none !important}}
+</style>
+</head>
+<body>
+<div id="testBanner" class="banner" hidden>Test mode: no data is being sent, because config.js has no web-app address.</div>
+
+<!-- ============ BLOCKED / INFO ============ -->
+<section id="sBlocked" class="screen page" hidden>
+  <div class="leaf">
+    <h1 id="blockedTitle"></h1>
+    <p id="blockedText"></p>
+    <p id="blockedCode" hidden>Your participant code: <span class="code" id="blockedCodeVal"></span></p>
+  </div>
+</section>
+
+<!-- ============ RESUME ============ -->
+<section id="sResume" class="screen page" hidden>
+  <div class="leaf">
+    <h1>Welcome back</h1>
+    <p id="resumeText"></p>
+    <div class="row"><button id="resumeBtn" type="button" class="primary">Continue in full screen</button></div>
+  </div>
+</section>
+
+<!-- ============ 1. WELCOME + CONSENT ============ -->
+<section id="sWelcome" class="screen page" hidden>
+  <div class="leaf">
+    <h1 id="studyTitle">Comparing line lengths</h1>
+    <p>In this study you compare the lengths of two red bars shown on different backgrounds. It takes <span id="durTxt">about 25 minutes</span> and must be done on a laptop or desktop computer with a keyboard, in one sitting, somewhere you won't be interrupted.</p>
+    <h2>What you will do</h2>
+    <ul>
+      <li>Answer a few short questions about yourself.</li>
+      <li>Set up your screen: measure it with a bank card and do a one-minute test that estimates how far you sit from the screen.</li>
+      <li>Judge and adjust bar lengths on about 130 screens, with short breaks.</li>
+    </ul>
+    <h2>Your data</h2>
+    <p>Your answers are saved under a random code, never with your name or email. They are stored in a spreadsheet that only the research team can open, and used only for this study. Taking part is voluntary: you can stop at any time by closing the page, without giving a reason. At the end you get your code; quote it if you later want your data deleted.</p>
+    <p id="whoTxt" class="small muted"></p>
+    <label class="check"><input type="checkbox" id="c18"> <span>I am 18 years old or older.</span></label>
+    <label class="check"><input type="checkbox" id="cAgree"> <span>I have read the information above and agree to take part.</span></label>
+    <div class="row"><button id="welcomeBtn" type="button" class="primary" disabled>Continue</button></div>
+  </div>
+</section>
+
+<!-- ============ 2. ABOUT YOU ============ -->
+<section id="sAbout" class="screen page" hidden>
+  <div class="leaf">
+    <h1>About you</h1>
+    <label class="field">Your age
+      <input id="qAge" type="number" min="18" max="99" inputmode="numeric" style="max-width:120px"></label>
+    <fieldset id="qVision">
+      <legend>Your eyesight</legend>
+      <div class="opts" style="flex-direction:column">
+        <label><input type="radio" name="vision" value="normal"> Normal, I don't need glasses or lenses</label>
+        <label><input type="radio" name="vision" value="corrected_wearing"> I need glasses or lenses and I'm wearing them now</label>
+        <label><input type="radio" name="vision" value="corrected_not_wearing"> I need glasses or lenses but I'm not wearing them now</label>
+      </div>
+    </fieldset>
+    <fieldset id="qDevice">
+      <legend>What are you using now?</legend>
+      <div class="opts">
+        <label><input type="radio" name="device" value="laptop"> A laptop screen</label>
+        <label><input type="radio" name="device" value="monitor"> A desktop monitor</label>
+        <label><input type="radio" name="device" value="other"> Something else</label>
+      </div>
+    </fieldset>
+    <fieldset id="qBefore">
+      <legend>Have you taken part in this study before?</legend>
+      <div class="opts">
+        <label><input type="radio" name="before" value="no"> No</label>
+        <label><input type="radio" name="before" value="yes"> Yes</label>
+      </div>
+    </fieldset>
+    <p class="formmsg" id="aboutMsg" role="status"></p>
+    <p class="small muted">The next steps work best in full screen; your browser may ask to allow it.</p>
+    <div class="row"><button id="aboutBtn" type="button" class="primary">Continue in full screen</button></div>
+  </div>
+</section>
+
+<!-- ============ 3. SCREEN CALIBRATION ============ -->
+<section id="sCalib" class="screen page" hidden>
+  <div class="leaf">
+    <h1>Measure your screen</h1>
+    <p>Hold a bank card, ID card or any card of that standard size against the screen, over the dark box. Move the slider until the box is exactly as big as the card. No card? Use a ruler and make the box 85.6&nbsp;mm wide.</p>
+    <div class="cardbox"><div id="card">85.6 &times; 54.0 mm</div></div>
+    <label class="field" style="font-weight:600">Box size
+      <input id="ppmRange" type="range" min="2" max="9" step="0.005" aria-describedby="ppmVal"></label>
+    <p class="small muted">Fine-tune with the <kbd>&larr;</kbd> <kbd>&rarr;</kbd> keys after clicking the slider. <span class="mono" id="ppmVal"></span></p>
+    <fieldset id="qMethod">
+      <legend>How did you measure?</legend>
+      <div class="opts">
+        <label><input type="radio" name="method" value="card"> With a card</label>
+        <label><input type="radio" name="method" value="ruler"> With a ruler</label>
+        <label><input type="radio" name="method" value="estimate"> I couldn't measure, I estimated</label>
+      </div>
+    </fieldset>
+    <p class="formmsg" id="calibMsg" role="status"></p>
+    <div class="row"><button id="calibBtn" type="button" class="primary">Continue</button></div>
+  </div>
+</section>
+
+<!-- ============ 4. VIEWING DISTANCE (blind spot) ============ -->
+<section id="sDist" class="screen page" hidden>
+  <div class="leaf wide">
+    <h1>How far are you from the screen?</h1>
+    <p>Sit comfortably at about arm's length from the screen, in the position you will keep for the whole study. This test uses your eye's natural blind spot to measure the distance. It takes about a minute.</p>
+    <ol>
+      <li>Put a finger of your left hand on the <kbd>Space</kbd> bar.</li>
+      <li>Cover your <strong>right</strong> eye with your right hand.</li>
+      <li>With your left eye, keep looking at the black square on the right. Don't follow the ball.</li>
+      <li>The red ball moves to the left. Press <kbd>Space</kbd> the moment it disappears.</li>
+    </ol>
+    <div id="bsArea" aria-label="Blind-spot test area"><div id="bsSquare"></div><div id="bsBall"></div></div>
+    <div class="row">
+      <button id="bsStartBtn" type="button" class="primary">Start the test</button>
+      <div class="dots" id="bsDots" aria-hidden="true"><span></span><span></span><span></span><span></span><span></span></div>
+      <span id="bsMsg" role="status"></span>
+    </div>
+    <div class="row">
+      <button id="distBtn" type="button" class="primary" hidden>Continue</button>
+      <button id="bsSkip" type="button" class="link">I can't do this test</button>
+    </div>
+  </div>
+</section>
+
+<!-- ============ 5. INSTRUCTIONS ============ -->
+<section id="sInstr" class="screen page" hidden>
+  <div class="leaf">
+    <h1>What to do</h1>
+    <p>Each screen shows two horizontal red bars, one above the other. Only the lower bar can change.</p>
+    <ol>
+      <li>Say whether the two bars look the same length: press <kbd>S</kbd> for same or <kbd>D</kbd> for different.</li>
+      <li>Then make the lower bar look exactly as long as the upper bar: <kbd>&larr;</kbd> makes it shorter, <kbd>&rarr;</kbd> makes it longer (hold the key to move faster). If the bars already look equal, leave them.</li>
+      <li>Press <kbd>Enter</kbd> when the two bars look equal.</li>
+    </ol>
+    <p>Go by how the bars look to you: there is no time limit and no right or wrong answer. Keep your head at the same distance as in the test, use both eyes, and don't measure with your fingers or any object.</p>
+    <p>There are 4 parts with a short break between them. You start with a few practice screens.</p>
+    <p class="formmsg" id="instrMsg" role="status"></p>
+    <div class="row"><button id="instrBtn" type="button" class="primary">Start practice</button></div>
+  </div>
+</section>
+
+<!-- ============ INTERLUDE ============ -->
+<section id="sGate" class="screen page" hidden>
+  <div class="leaf">
+    <h1 id="gateTitle"></h1>
+    <p id="gateText"></p>
+    <div class="row"><button id="gateBtn" type="button" class="primary">Continue</button> <span class="muted">or press <kbd>Space</kbd></span></div>
+  </div>
+</section>
+
+<!-- ============ STIMULUS STAGE ============ -->
+<section id="stage" class="screen" hidden>
+  <span id="counter"></span>
+  <canvas id="scene" width="850" height="500" aria-label="Two red bars to compare"></canvas>
+  <div id="prompt">
+    <p id="promptText">&nbsp;</p>
+    <div class="row" id="judgeBtns" hidden>
+      <button type="button" id="sameBtn" tabindex="-1"><kbd>S</kbd>&nbsp; Same</button>
+      <button type="button" id="diffBtn" tabindex="-1"><kbd>D</kbd>&nbsp; Different</button>
+    </div>
+    <div class="row" id="adjBtns" hidden>
+      <button type="button" id="shorterBtn" tabindex="-1"><kbd>&larr;</kbd>&nbsp; Shorter</button>
+      <button type="button" id="longerBtn" tabindex="-1">Longer &nbsp;<kbd>&rarr;</kbd></button>
+      <button type="button" id="okBtn" class="primary" tabindex="-1">They look equal &nbsp;(Enter)</button>
+    </div>
+  </div>
+  <div id="fitwarn" hidden>
+    <h1>The window is too small</h1>
+    <p>Make the window bigger or go back to full screen. The study continues by itself.</p>
+    <button type="button" id="fsBtn2">Full screen</button>
+  </div>
+</section>
+
+<!-- ============ 6. AFTER THE TASK ============ -->
+<section id="sPost" class="screen page" hidden>
+  <div class="leaf">
+    <h1>Almost done: a few last questions</h1>
+    <fieldset id="qCare">
+      <legend>How carefully did you do the task?</legend>
+      <div class="scale">
+        <label><input type="radio" name="care" value="1">1<span class="small muted">not at all</span></label>
+        <label><input type="radio" name="care" value="2">2</label>
+        <label><input type="radio" name="care" value="3">3</label>
+        <label><input type="radio" name="care" value="4">4</label>
+        <label><input type="radio" name="care" value="5">5<span class="small muted">very</span></label>
+      </div>
+    </fieldset>
+    <fieldset id="qTools">
+      <legend>Did you measure the bars with your fingers, a ruler or any object?</legend>
+      <div class="opts"><label><input type="radio" name="tools" value="no"> No</label><label><input type="radio" name="tools" value="yes"> Yes</label></div>
+    </fieldset>
+    <fieldset id="qMoved">
+      <legend>Did you stay at about the same distance from the screen?</legend>
+      <div class="opts"><label><input type="radio" name="moved" value="stayed"> Yes, mostly</label><label><input type="radio" name="moved" value="moved"> No, I moved a lot</label></div>
+    </fieldset>
+    <fieldset id="qKnew">
+      <legend>Before today, did you know the Ponzo illusion (two equal lines look different because of converging lines)?</legend>
+      <div class="opts"><label><input type="radio" name="knew" value="no"> No</label><label><input type="radio" name="knew" value="yes"> Yes</label><label><input type="radio" name="knew" value="unsure"> Not sure</label></div>
+    </fieldset>
+    <fieldset id="qUse">
+      <legend>Honestly, should we use your data? Your answer changes nothing for you.</legend>
+      <div class="opts" style="flex-direction:column"><label><input type="radio" name="use" value="yes"> Yes, I did the task properly</label><label><input type="radio" name="use" value="no"> No, I was distracted or something went wrong</label></div>
+    </fieldset>
+    <label class="field">Anything that went wrong or distracted you? (optional)
+      <textarea id="qComments" maxlength="500"></textarea></label>
+    <p class="formmsg" id="postMsg" role="status"></p>
+    <div class="row"><button id="postBtn" type="button" class="primary">Finish</button></div>
+  </div>
+</section>
+
+<!-- ============ 7. DONE + DEBRIEF ============ -->
+<section id="sDone" class="screen page" hidden>
+  <div class="leaf">
+    <h1>Thank you!</h1>
+    <p id="saveStatus" role="status" class="muted">Saving your answers&hellip;</p>
+    <div class="row" id="saveFail" hidden>
+      <button id="retryBtn" type="button">Try sending again</button>
+      <button id="dlBtn" type="button">Download my data</button>
+    </div>
+    <p id="saveFailHelp" class="small" hidden></p>
+    <p>Your participant code: <span class="code" id="doneCode"></span></p>
+    <p class="small muted">Keep it if you might want your data deleted later.</p>
+    <h2>What this study was about</h2>
+    <p>On many screens the upper bar looked longer than the lower one even when both had the same length. This is the Ponzo illusion: lines that converge towards a horizon make the upper bar seem farther away, and the brain enlarges what it believes is far. We tested which background features (converging lines, a horizon, shading, texture, trees) make the illusion stronger, and whether they add up.</p>
+    <p>Please don't tell people who might still take part what the study is about until it has ended.</p>
+    <p id="doneContact" class="small muted"></p>
+    <div class="row" id="labNext" hidden><button id="nextBtn" type="button" class="primary">Next participant</button></div>
+  </div>
+</section>
+
+<script>
+"use strict";
+/* ============================================================
+   CORE (pure logic: no DOM) — also exercised by the test script
+   ============================================================ */
+const VERSION = "3.0.0";
+const CUES = [
+  {key:"lines",   code:"L", label:"Slanted lines"},
+  {key:"horizon", code:"H", label:"Horizon + ground lines"},
+  {key:"shade",   code:"S", label:"Simple shade"},
+  {key:"texture", code:"X", label:"Complex texture"},
+  {key:"trees",   code:"T", label:"Trees near the tracks"}
+];
+const START_OFFSETS = [-10, 0, 10, 25];   // % of upper bar
+const STEP_PCT = 0.5;                      // one key press
+const MIN_PCT = -50, MAX_PCT = 80;         // adjustment limits
+const ITI_MS = 700, MIN_JUDGE_MS = 250, MIN_CONFIRM_MS = 300;
+
+/* Scene geometry, in units of scene height. Fixed for every trial. */
+const G = {W:1.7, H:1, cx:0.85, yVP:0.22, yTop:0.42, yBot:0.80, L0:0.30, barT:0.018, railHW:0.741, treeX:1.0};
+const sOf = y => (y - G.yVP) / (G.H - G.yVP);              // 0 at vanishing point, 1 at bottom edge
+/* Depth lattices (stored as s = 1/depth), evenly spaced in depth so they compress toward the horizon.
+   Ground lines: both bars sit midway in depth between two neighbouring lines, and no line comes
+   closer than 0.019 scene heights to a bar. Trees: twice as dense, none at a bar's own depth. */
+function lattice(k, zMax){
+  const zt = 1 / sOf(G.yTop), zb = 1 / sOf(G.yBot), d = (zt - zb) / k, out = [];
+  for (let z = zb - d / 2; z <= zMax; z += d) if (z >= 1) out.push(1 / z);
+  return out;
+}
+const GROUND_S = lattice(2, 16), TREE_S = lattice(4, 9).filter(s => s < 0.7);
+
+function mulberry32(a){ a >>>= 0; return function(){ a = (a + 0x6D2B79F5) >>> 0; let t = a;
+  t = Math.imul(t ^ (t >>> 15), t | 1); t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+  return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }; }
+function shuffle(arr, rng){ for (let i = arr.length - 1; i > 0; i--){ const j = Math.floor(rng() * (i + 1)); const t = arr[i]; arr[i] = arr[j]; arr[j] = t; } return arr; }
+function cuesOf(combo){ const o = {}; CUES.forEach((c, i) => o[c.key] = !!(combo & (1 << i))); return o; }
+function codeOf(combo){ return CUES.map((c, i) => c.code + ((combo >> i) & 1)).join(""); }
+
+/* 4 blocks x 32 combinations. Every block holds each combination once and
+   each starting offset 8 times; every combination meets each offset once. */
+function buildTrials(seed, runType){
+  const rng = mulberry32(seed);
+  const combos = shuffle([...Array(32).keys()], rng);
+  const perm = shuffle(START_OFFSETS.slice(), rng);
+  const blocks = [];
+  for (let b = 0; b < 4; b++){
+    let blk, guard = 0;
+    do { blk = shuffle(combos.map((c, k) => ({combo:c, start:perm[(k + b) % 4]})), rng); guard++; }
+    while (b > 0 && blk[0].combo === blocks[b - 1][31].combo && guard < 100);
+    blocks.push(blk);
+  }
+  const pCombos = shuffle([...Array(32).keys()], rng), pStarts = shuffle(START_OFFSETS.slice(), rng);
+  const nPractice = runType === "pilot" ? 2 : 4;
+  const trials = [];
+  for (let i = 0; i < nPractice; i++) trials.push({phase:"practice", number:i + 1, block:0, inBlock:i + 1, combo:pCombos[i], start:pStarts[i]});
+  let n = 0;
+  blocks.forEach((blk, b) => blk.forEach((t, i) => {
+    if (runType === "pilot" && (b > 0 || i >= 16)) return;
+    trials.push({phase:"main", number:++n, block:b + 1, inBlock:i + 1, combo:t.combo, start:t.start});
+  }));
+  return trials;
+}
+
+const CSV_COLS = ["session_id","experimenter_id","experimenter_name","participant_id","session_start_iso","run_type","seed","app_version","session_complete","excluded","exclude_reason","phase","trial_number","block","trial_in_block",
+  "condition_code","cue_lines","cue_horizon","cue_shade","cue_texture","cue_trees","n_cues",
+  "start_offset_pct","judged_same","rt_judgement_ms","final_offset_pct","adjusted","n_steps","n_reversals","rt_adjust_ms",
+  "top_length_px","start_length_px","final_length_px","focus_lost","window_changed","fullscreen","dpr","window_w","window_h",
+  "px_per_mm","top_bar_mm","viewing_distance_cm","top_bar_deg","scene_w_px","scene_h_px","age","vision","notes","completed_iso"];
+function csvCell(v){ if (v === null || v === undefined) return ""; const s = String(v); return /[",\n\r]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s; }
+/* sessions: [{id, mid?, meta, results, finished, excluded, excludeReason}] -> one row per trial */
+function toCsv(sessions, opts){
+  opts = opts || {};
+  const lines = [CSV_COLS.join(",")];
+  for (const s of sessions){
+    const m = s.meta || {}, mid = s.mid || m.experimenterId || "";
+    const base = {session_id:s.id || "", experimenter_id:mid, experimenter_name:opts.nameOf ? opts.nameOf(mid) : "",
+      participant_id:m.pid, session_start_iso:m.started, run_type:m.runType, seed:m.seed, app_version:m.version,
+      session_complete:s.finished ? 1 : 0, excluded:s.excluded ? 1 : 0, exclude_reason:s.excludeReason || "",
+      px_per_mm:m.ppm, top_bar_mm:m.barMm, viewing_distance_cm:m.dist, top_bar_deg:m.barDeg, scene_w_px:m.sceneW, scene_h_px:m.sceneH,
+      age:m.age, vision:m.vision, notes:m.notes};
+    for (const r of (s.results || [])){
+      if (opts.mainOnly && r.phase !== "main") continue;
+      const row = Object.assign({}, base, r);
+      lines.push(CSV_COLS.map(c => csvCell(row[c])).join(","));
+    }
+  }
+  return lines.join("\r\n") + "\r\n";
+}
+function mean(a){ return a.length ? a.reduce((x, y) => x + y, 0) / a.length : NaN; }
+function summarize(results){
+  const main = results.filter(r => r.phase === "main");
+  const pick = f => main.filter(f).map(r => r.final_offset_pct);
+  return {
+    n: main.length,
+    all: mean(pick(() => true)),
+    baseline: mean(pick(r => r.n_cues === 0)),
+    full: mean(pick(r => r.n_cues === 5)),
+    same: main.length ? main.filter(r => r.judged_same === 1).length / main.length : NaN,
+    cues: CUES.map(c => { const off = mean(pick(r => r["cue_" + c.key] === 0)), on = mean(pick(r => r["cue_" + c.key] === 1)); return {label:c.label, off, on, diff:on - off}; })
+  };
+}
+
+/* ---------- stimulus drawing (needs a 2D context only) ---------- */
+const COL = {bg:"#d6d6d6", shadeNear:"#9e9e9e", rail:"#262626", ground:"#4d4d4d", trunk:"#4a3b2e", leaf:"#2f4a3a", bar:"#a8121a"};
+/* The texture is one fixed set of pebbles lying on the ground plane, identical in every trial. */
+const PEBBLES = (() => {
+  const rng = mulberry32(20261117), out = [];
+  while (out.length < 48000){
+    const z = 1 + rng() * 27, x = (rng() * 2 - 1) * 26, r = 0.02 + rng() * 0.02, dark = rng() < 0.55, a = 0.10 + rng() * 0.20;
+    if (Math.abs(x / z) > 0.92) continue;
+    out.push({s:1 / z, x, r, dark, a});
+  }
+  return out.sort((p, q) => p.s - q.s);   // far to near
+})();
+
+function drawContext(c, u, cues){
+  const W = G.W * u, H = G.H * u, cx = G.cx * u, yv = G.yVP * u, gr = (G.H - G.yVP) * u;
+  c.save(); c.beginPath(); c.rect(0, 0, W, H); c.clip();
+  c.fillStyle = COL.bg; c.fillRect(0, 0, W, H);
+  if (cues.shade){
+    const g = c.createLinearGradient(0, yv, 0, H); g.addColorStop(0, COL.bg); g.addColorStop(1, COL.shadeNear);
+    c.fillStyle = g; c.fillRect(0, yv, W, H - yv);
+  }
+  if (cues.texture){
+    for (const p of PEBBLES){
+      const rx = p.r * p.s * u; if (rx < 0.4) continue;
+      const ry = rx * Math.max(0.3, (G.H - G.yVP) * p.s);
+      c.fillStyle = (p.dark ? "rgba(0,0,0," : "rgba(255,255,255,") + p.a.toFixed(3) + ")";
+      const x = cx + p.x * p.s * u, y = yv + gr * p.s;
+      if (rx < 1.2) c.fillRect(x - rx, y - ry, 2 * rx, 2 * ry);
+      else { c.beginPath(); c.ellipse(x, y, rx, ry, 0, 0, Math.PI * 2); c.fill(); }
+    }
+  }
+  if (cues.horizon){
+    c.strokeStyle = COL.ground; c.lineCap = "butt";
+    c.lineWidth = Math.max(1, 0.003 * u); c.beginPath(); c.moveTo(0, yv); c.lineTo(W, yv); c.stroke();
+    for (const s of GROUND_S){
+      const y = yv + gr * s; c.lineWidth = Math.max(1, 0.005 * s * u);
+      c.beginPath(); c.moveTo(0, y); c.lineTo(W, y); c.stroke();
+    }
+  }
+  if (cues.lines){
+    c.strokeStyle = COL.rail; c.lineWidth = Math.max(1.5, 0.008 * u); c.lineCap = "butt";
+    for (const side of [-1, 1]){ c.beginPath(); c.moveTo(cx, yv); c.lineTo(cx + side * G.railHW * 1.06 * u, yv + gr * 1.06); c.stroke(); }
+  }
+  if (cues.trees){
+    for (let i = TREE_S.length - 1; i >= 0; i--){
+      const s = TREE_S[i], by = yv + gr * s, k = s * u;
+      for (const side of [-1, 1]){
+        const x = cx + side * G.treeX * k;
+        c.fillStyle = COL.trunk; c.fillRect(x - 0.022 * k, by - 0.26 * k, 0.044 * k, 0.26 * k);
+        c.fillStyle = COL.leaf;
+        const tiers = [[0.18, 0.56, 0.14], [0.40, 0.80, 0.115], [0.64, 1.05, 0.085]];   // [bottom, top, half-width] x k
+        for (const [b, t, hw] of tiers){ c.beginPath(); c.moveTo(x - hw * k, by - b * k); c.lineTo(x + hw * k, by - b * k); c.lineTo(x, by - t * k); c.closePath(); c.fill(); }
+      }
+    }
+  }
+  c.restore();
+}
+function drawBars(c, u, offsetPct){
+  const t = G.barT * u, top = G.L0 * u, bot = top * (1 + offsetPct / 100);
+  c.fillStyle = COL.bar;
+  c.fillRect(G.cx * u - top / 2, G.yTop * u - t / 2, top, t);
+  c.fillRect(G.cx * u - bot / 2, G.yBot * u - t / 2, bot, t);
+}
+/* ====================== END CORE ====================== */
+
+/* ============================================================
+   ONLINE PARTICIPANT APP
+   ============================================================ */
+const CFG = Object.assign({
+  endpoint:"", token:"", studyId:"ponzo-cues", title:"Comparing line lengths", researchers:"", contactEmail:"",
+  durationText:"about 25 minutes", barDeg:4, flushEvery:8, collectionOpen:true, assumedDistanceCm:57
+}, (typeof window !== "undefined" && window.PONZO_CONFIG) || {});
+const ENDPOINT_OK = /^https?:\/\/\S+$/.test(CFG.endpoint || "") && !/PASTE/i.test(CFG.endpoint);
+const Q = new URLSearchParams(location.search);
+const MODE = Q.get("mode") === "lab" ? "lab" : "online";
+const RUN = Q.get("pilot") === "1" ? "pilot" : "full";
+const SRC = (Q.get("src") || "").replace(/[^A-Za-z0-9_.-]/g, "").slice(0, 40);
+const KEY = "ponzo.online." + String(CFG.studyId).replace(/[^A-Za-z0-9_-]/g, "") + (RUN === "pilot" ? ".pilot" : "");
+const DONE_KEY = KEY + ".done";
+const CATCH_PASS_LIMIT = 15;                 /* |final offset| at most 15% on a catch trial */
+const BS_ANGLE = 13.5, BS_REPS = 5, BS_SPEED_MM = 40;
+
+const TRIAL_COLS = ["session_id","participant_code","run_type","mode","seq","phase","trial_number","block","trial_in_block",
+  "condition_code","cue_lines","cue_horizon","cue_shade","cue_texture","cue_trees","n_cues","start_offset_pct",
+  "judged_same","rt_judgement_ms","final_offset_pct","adjusted","n_steps","n_reversals","rt_adjust_ms","catch_pass",
+  "top_length_px","final_length_px","focus_lost","tab_hidden","window_changed","fullscreen","window_w","window_h",
+  "completed_iso","batch_id","app_version"];
+const SESSION_COLS = ["session_id","participant_code","study_id","app_version","mode","source","run_type","status",
+  "started_iso","last_update_iso","completed_iso","duration_min","n_done","n_total","catch_done","catch_passed",
+  "age","vision","device","seed","px_per_mm","calibration_method","distance_cm","distance_method","distance_spread_cm",
+  "blindspot_mm","bar_deg_target","bar_deg_actual","bar_mm","scene_scaled","scene_w_px","scene_h_px",
+  "screen_w","screen_h","window_w_start","window_h_start","dpr","fullscreen_start","language","user_agent",
+  "attentive","used_tools","moved","knew_ponzo","use_data","comments","resumed","tab_hidden_total","send_mode"];
+
+const $ = id => document.getElementById(id);
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+const nowIso = () => new Date().toISOString();
+const store = {
+  get(k){ try { return JSON.parse(localStorage.getItem(k)); } catch (e) { return null; } },
+  set(k, v){ try { localStorage.setItem(k, JSON.stringify(v)); return true; } catch (e) { return false; } },
+  del(k){ try { localStorage.removeItem(k); } catch (e) {} }
+};
+function show(id){ document.querySelectorAll(".screen").forEach(s => { s.hidden = s.id !== id; }); window.scrollTo(0, 0); }
+function isFullscreen(){ return !!document.fullscreenElement; }
+function afterFullscreen(cb){
+  let done = false; const go = () => { if (done) return; done = true; document.removeEventListener("fullscreenchange", go); setTimeout(cb, 150); };
+  document.addEventListener("fullscreenchange", go); setTimeout(go, 900);
+}
+function goFullscreen(){ try { const p = document.documentElement.requestFullscreen(); if (p && p.catch) p.catch(() => {}); } catch (e) {} }
+function radio(name){ const el = document.querySelector('input[name="' + name + '"]:checked'); return el ? el.value : ""; }
+function rnd32(){ try { return crypto.getRandomValues(new Uint32Array(1))[0]; } catch (e) { return (Date.now() ^ (Math.random() * 4294967296)) >>> 0; } }
+function makeCode(){ const A = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"; let s = "PZ"; for (let i = 0; i < 6; i++) s += A[rnd32() % A.length]; return s; }
+
+/* ---------- schedule: practice + 4 blocks of (32 conditions + 1 attention check) ---------- */
+function buildSchedule(seed, runType){
+  const base = buildTrials(seed, runType), rng = mulberry32((seed ^ 0x9E3779B9) >>> 0);
+  const practice = base.filter(t => t.phase === "practice"), main = base.filter(t => t.phase === "main");
+  const nBlocks = runType === "pilot" ? 1 : 4;
+  const catchStarts = runType === "pilot" ? [50] : shuffle([50, 50, -40, -40], rng);
+  const out = practice.map(t => Object.assign({}, t));
+  let nCatch = 0;
+  for (let b = 1; b <= nBlocks; b++){
+    const blk = main.filter(t => t.block === b).map(t => Object.assign({}, t));
+    const pos = 5 + Math.floor(rng() * (blk.length - 4));        /* never among the first 5 of a block */
+    blk.splice(pos, 0, {phase:"catch", number:++nCatch, block:b, combo:0, start:catchStarts[b - 1]});
+    blk.forEach((t, i) => { t.inBlock = i + 1; out.push(t); });
+  }
+  out.forEach((t, i) => { t.seq = i + 1; });
+  return out;
+}
+
+/* ---------- state (kept in this browser so a reload can resume) ---------- */
+let ST = null;
+function newState(){
+  const code = makeCode(), started = nowIso();
+  const sid = started.replace(/[^0-9]/g, "").slice(0, 14) + "-" + code;
+  return { sessionId:sid, code, created:Date.now(), stage:"welcome", finished:false, trialsDone:false,
+    meta:{ session_id:sid, participant_code:code, study_id:CFG.studyId, app_version:VERSION, mode:MODE, source:SRC, run_type:RUN,
+           status:"started", started_iso:started, seed:rnd32(), screen_w:screen.width, screen_h:screen.height,
+           dpr:window.devicePixelRatio || 1, language:navigator.language || "", user_agent:navigator.userAgent,
+           resumed:0, tab_hidden_total:0, send_mode:ENDPOINT_OK ? "cors" : "none" },
+    trials:[], results:[], pending:[], queue:[], batchN:0, sendError:"" };
+}
+function save(){ if (ST){ ST.lastActive = Date.now(); store.set(KEY, ST); } }
+function sessionRow(){
+  const m = ST.meta, r = {};
+  m.n_done = ST.results.filter(x => x.phase !== "practice").length;
+  m.n_total = ST.trials.filter(x => x.phase !== "practice").length;
+  m.catch_done = ST.results.filter(x => x.phase === "catch").length;
+  m.catch_passed = ST.results.filter(x => x.phase === "catch" && x.catch_pass === 1).length;
+  m.last_update_iso = nowIso();
+  SESSION_COLS.forEach(c => { r[c] = m[c] === undefined || m[c] === null ? "" : m[c]; });
+  return r;
+}
+
+/* ---------- sending: batches go out one at a time, in order, retried until they arrive ---------- */
+let sending = false, failStreak = 0, typeErrStreak = 0;
+function enqueue(){
+  if (!ST) return;
+  const batch_id = ST.sessionId + "-b" + (++ST.batchN);
+  const trials = ST.pending.map(t => { const o = {}; TRIAL_COLS.forEach(c => { o[c] = c === "batch_id" ? batch_id : (t[c] === undefined ? "" : t[c]); }); return o; });
+  ST.queue.push({token:CFG.token, batch_id, session:sessionRow(), trials});
+  ST.pending = []; save(); pump();
+}
+async function sendOne(b){
+  if (ST.meta.send_mode === "no-cors"){
+    await fetch(CFG.endpoint, {method:"POST", mode:"no-cors", body:JSON.stringify(b)});
+    return {ok:true};
+  }
+  const ctl = new AbortController(), to = setTimeout(() => ctl.abort(), 25000);
+  try {
+    const r = await fetch(CFG.endpoint, {method:"POST", body:JSON.stringify(b), signal:ctl.signal});
+    if (!r.ok) return {ok:false, retry:true};
+    const j = await r.json();
+    if (j && j.ok) return {ok:true};
+    const err = (j && j.error) || "bad_response", fatal = /^(bad_token|bad_json|empty|too_large|invalid)/.test(err);
+    return {ok:false, retry:!fatal, error:err};
+  } finally { clearTimeout(to); }
+}
+async function pump(){
+  if (sending || !ENDPOINT_OK || !ST) return;
+  sending = true;
+  try {
+    while (ST && ST.queue.length && !ST.sendError){
+      if (navigator.onLine === false){ await new Promise(r => window.addEventListener("online", r, {once:true})); }
+      let res;
+      try { res = await sendOne(ST.queue[0]); }
+      catch (e) {
+        res = {ok:false, retry:true};
+        /* the page cannot read the reply (a browser or network policy): fall back to sending without reading it.
+           Apps Script still records the batch, and it ignores batches it has already stored. */
+        if (e && e.name === "TypeError" && navigator.onLine !== false && ++typeErrStreak >= 3 && ST.meta.send_mode === "cors"){ ST.meta.send_mode = "no-cors"; }
+      }
+      if (res.ok){ ST.queue.shift(); failStreak = 0; save(); }
+      else if (!res.retry){ ST.sendError = res.error; save(); break; }
+      else { failStreak++; await sleep(Math.min(30000, 1000 * Math.pow(2, Math.min(failStreak, 5)))); }
+      renderSave();
+    }
+  } finally { sending = false; renderSave(); }
+}
+function beaconAll(){
+  if (!ST || !ENDPOINT_OK || !navigator.sendBeacon) return;
+  if (ST.pending.length) enqueue();
+  ST.queue.forEach(b => { try { navigator.sendBeacon(CFG.endpoint, new Blob([JSON.stringify(b)], {type:"text/plain"})); } catch (e) {} });
+}
+window.addEventListener("pagehide", beaconAll);
+
+/* ---------- screens before the task ---------- */
+function blocked(title, text, code){
+  $("blockedTitle").textContent = title; $("blockedText").textContent = text;
+  $("blockedCode").hidden = !code; if (code) $("blockedCodeVal").textContent = code;
+  show("sBlocked");
+}
+function initWelcome(){
+  $("studyTitle").textContent = CFG.title; document.title = CFG.title;
+  $("durTxt").textContent = RUN === "pilot" ? "about 6 minutes (pilot version)" : CFG.durationText;
+  const who = [CFG.researchers, CFG.contactEmail ? "Questions: " + CFG.contactEmail : ""].filter(Boolean).join(". ");
+  $("whoTxt").textContent = who ? "Research team: " + who + "." : "";
+  const upd = () => { $("welcomeBtn").disabled = !($("c18").checked && $("cAgree").checked); };
+  $("c18").addEventListener("change", upd); $("cAgree").addEventListener("change", upd);
+}
+function aboutNext(){
+  const age = parseInt($("qAge").value, 10), vision = radio("vision"), device = radio("device"), before = radio("before");
+  const msg = $("aboutMsg");
+  if (!(age >= 18 && age <= 99)){ msg.textContent = "Please enter your age (18 or older)."; return; }
+  if (!vision || !device || !before){ msg.textContent = "Please answer every question."; return; }
+  if (before === "yes"){ store.del(KEY); ST = null; blocked("Thank you", "Each person can take part only once, so you don't need to continue. Thank you for your help!"); return; }
+  Object.assign(ST.meta, {age, vision, device});
+  goFullscreen();
+  ST.stage = "calib"; save(); openCalib();
+}
+function openCalib(){
+  const v = ST.meta.px_per_mm || 3.78;
+  $("ppmRange").value = v; setCard(v); show("sCalib");
+}
+function setCard(v){
+  $("card").style.width = (85.6 * v) + "px"; $("card").style.height = (53.98 * v) + "px";
+  $("ppmVal").textContent = "(" + (+v).toFixed(2) + " px per mm)";
+}
+function calibNext(){
+  const method = radio("method");
+  if (!method){ $("calibMsg").textContent = "Please say how you measured."; return; }
+  ST.meta.px_per_mm = +(+$("ppmRange").value).toFixed(3); ST.meta.calibration_method = method;
+  ST.stage = "dist"; save(); openDist();
+}
+
+/* ---------- viewing distance: blind-spot test (Li et al., 2020, "virtual chinrest") ---------- */
+const BS = {running:false, vals:[], attempts:0, x:0, sqX:0, raf:0};
+function openDist(){ BS.vals = []; renderDots(); $("bsMsg").textContent = ""; $("distBtn").hidden = true; $("bsStartBtn").hidden = false; $("bsStartBtn").textContent = "Start the test"; show("sDist"); }
+function renderDots(){ [...$("bsDots").children].forEach((d, i) => d.classList.toggle("on", i < BS.vals.length)); }
+function bsRep(){
+  const area = $("bsArea"), W = area.clientWidth, ppm = ST.meta.px_per_mm, size = Math.max(10, Math.round(5 * ppm));
+  const sq = $("bsSquare"), ball = $("bsBall");
+  sq.style.width = sq.style.height = size + "px"; ball.style.width = ball.style.height = size + "px";
+  BS.sqX = W - size - 30; sq.style.left = BS.sqX + "px";
+  BS.x = BS.sqX - 20 * ppm; ball.style.left = BS.x + "px"; ball.hidden = false;
+  $("bsStartBtn").hidden = true; $("bsMsg").textContent = "Look at the square and press Space when the ball disappears.";
+  let last = null;
+  const frame = t => {
+    if (!BS.running) return;
+    if (last !== null) BS.x -= BS_SPEED_MM * ppm * (t - last) / 1000;
+    last = t; ball.style.left = BS.x + "px";
+    if (BS.x < 4){ BS.running = false; $("bsMsg").textContent = "The ball reached the edge. Keep your right eye covered, look only at the square, and try again."; $("bsStartBtn").textContent = "Try again"; $("bsStartBtn").hidden = false; return; }
+    BS.raf = requestAnimationFrame(frame);
+  };
+  BS.running = true; BS.raf = requestAnimationFrame(frame);
+}
+function bsHit(){
+  if (!BS.running) return;
+  BS.running = false; cancelAnimationFrame(BS.raf);
+  const ppm = ST.meta.px_per_mm, mm = (BS.sqX - BS.x) / ppm;
+  BS.vals.push(mm / Math.tan(BS_ANGLE * Math.PI / 180)); renderDots();
+  if (BS.vals.length < BS_REPS){ $("bsMsg").textContent = "Got it. Next one in a moment…"; setTimeout(() => { if (!$("sDist").hidden) bsRep(); }, 900); return; }
+  bsEvaluate();
+}
+function median(a){ const s = a.slice().sort((x, y) => x - y), n = s.length; return n ? (n % 2 ? s[(n - 1) / 2] : (s[n / 2 - 1] + s[n / 2]) / 2) : NaN; }
+function bsEvaluate(){
+  BS.attempts++;
+  const med = median(BS.vals), spread = Math.max(...BS.vals) - Math.min(...BS.vals);
+  const ok = med >= 250 && med <= 1000 && spread <= 0.4 * med;
+  if (ok){ setDistance(med, "blindspot", spread); return; }
+  if (BS.attempts < 2){
+    BS.vals = []; renderDots();
+    $("bsMsg").textContent = "The measurements didn't agree well. Sit still, keep your right eye covered, and try once more.";
+    $("bsStartBtn").textContent = "Try again"; $("bsStartBtn").hidden = false; return;
+  }
+  setDistance(CFG.assumedDistanceCm * 10, "assumed_after_fail", spread);
+}
+function setDistance(mm, method, spread){
+  Object.assign(ST.meta, {distance_cm:+(mm / 10).toFixed(1), distance_method:method,
+    distance_spread_cm:isFinite(spread) ? +(spread / 10).toFixed(1) : "", blindspot_mm:BS.vals.map(v => Math.round(v)).join(" ")});
+  $("bsStartBtn").hidden = true; $("bsSkip").hidden = true; $("distBtn").hidden = false;
+  $("bsMsg").textContent = method === "blindspot"
+    ? "Done: you sit about " + Math.round(mm / 10) + " cm from the screen. Please stay at this distance."
+    : "We'll use a standard distance. Please sit at about arm's length (" + CFG.assumedDistanceCm + " cm) and stay there.";
+  save(); $("distBtn").focus();
+}
+
+/* ---------- stimulus size: fixed visual angle, shrunk only if the window is too small ---------- */
+function fitsWindow(w, h){ return window.innerWidth >= w + 32 && window.innerHeight >= h + 150; }
+function computeScene(){
+  const m = ST.meta, ppm = m.px_per_mm, dist = m.distance_cm * 10;
+  const barMm = 2 * dist * Math.tan(CFG.barDeg / 2 * Math.PI / 180);
+  let u = barMm / G.L0 * ppm;
+  const maxU = Math.min((window.innerWidth - 32) / G.W, (window.innerHeight - 150) / G.H), scaled = u > maxU;
+  if (scaled) u = maxU;
+  const barPx = G.L0 * u;
+  Object.assign(m, {u, bar_deg_target:CFG.barDeg, bar_mm:+(barPx / ppm).toFixed(1),
+    bar_deg_actual:+(2 * Math.atan(barPx / ppm / 2 / dist) * 180 / Math.PI).toFixed(3), scene_scaled:scaled ? 1 : 0,
+    scene_w_px:Math.round(G.W * u), scene_h_px:Math.round(G.H * u), window_w_start:window.innerWidth, window_h_start:window.innerHeight,
+    fullscreen_start:isFullscreen() ? 1 : 0});
+}
+function beginTask(){
+  computeScene();
+  if (ST.meta.bar_deg_actual < CFG.barDeg * 0.6 && !ST.warnedSmall){
+    ST.warnedSmall = true;
+    $("instrMsg").textContent = "Your window is quite small, so the pictures will be small. If you can, enlarge the window or use full screen, then press Start again.";
+    return;
+  }
+  ST.trials = buildSchedule(ST.meta.seed, RUN); ST.results = [];
+  ST.meta.status = "in_progress"; ST.stage = "trials"; ST.gateAt = -1;
+  enqueue();                               /* a first Sessions row, so the team sees the session start */
+  startNext();
+}
+
+/* ---------- the trial loop ---------- */
+let T = null, ctxCanvas = null;
+function openGate(kind){
+  const i = ST.results.length, tr = ST.trials[i], nBlocks = RUN === "pilot" ? 1 : 4;
+  const txt = {
+    resume: ["Ready to continue", "You are on screen " + (i + 1) + " of " + ST.trials.length + ". Take your position again, at the same distance as before."],
+    practiceDone: ["Practice finished", "The real screens start now and work exactly the same way."],
+    "break": ["Short break", tr ? "Part " + (tr.block - 1) + " of " + nBlocks + " is done. Look away from the screen for a moment, then continue when you are ready." : ""]
+  }[kind];
+  $("gateTitle").textContent = txt[0]; $("gateText").textContent = txt[1];
+  show("sGate"); $("gateBtn").focus();
+}
+function closeGate(){ if ($("sGate").hidden) return; ST.gateAt = ST.results.length; startNext(); }
+function startNext(){
+  const i = ST.results.length;
+  if (i >= ST.trials.length){ trialsFinished(); return; }
+  const tr = ST.trials[i], prev = i > 0 ? ST.trials[i - 1] : null;
+  if (prev && ST.gateAt !== i){
+    if (prev.phase === "practice" && tr.phase !== "practice"){ openGate("practiceDone"); return; }
+    if (prev.phase !== "practice" && prev.block !== tr.block){ openGate("break"); return; }
+  }
+  runTrial(tr);
+}
+function paintScene(offsetPct, blank){
+  const m = ST.meta, cv = $("scene"), c = cv.getContext("2d"), k = cv.width / m.scene_w_px;
+  c.setTransform(k, 0, 0, k, 0, 0);
+  if (blank){ c.fillStyle = COL.bg; c.fillRect(0, 0, m.scene_w_px, m.scene_h_px); return; }
+  c.save(); c.setTransform(1, 0, 0, 1, 0, 0); c.drawImage(ctxCanvas, 0, 0); c.restore();
+  drawBars(c, m.u, offsetPct);
+}
+function setPrompt(phase){
+  $("judgeBtns").hidden = phase !== "judge"; $("adjBtns").hidden = phase !== "adjust";
+  $("promptText").textContent = phase === "judge" ? "Do the two red bars look the same length?"
+    : phase === "adjust" ? "Make the lower bar look exactly as long as the upper bar, then confirm." : " ";
+}
+function runTrial(tr, restarted){
+  show("stage");
+  const m = ST.meta;
+  if (!fitsWindow(m.scene_w_px, m.scene_h_px)){ T = {tr, phase:"wait"}; setPrompt("iti"); $("fitwarn").hidden = false; return; }
+  $("fitwarn").hidden = true;
+  const dpr = window.devicePixelRatio || 1, cv = $("scene");
+  cv.width = Math.round(m.scene_w_px * dpr); cv.height = Math.round(m.scene_h_px * dpr);
+  cv.style.width = m.scene_w_px + "px"; cv.style.height = m.scene_h_px + "px";
+  T = {tr, phase:"iti", steps:Math.round(tr.start / STEP_PCT), nSteps:0, nRev:0, lastDir:0, focusLost:false, hidden:false, resized:!!restarted, dpr};
+  if (tr.phase === "practice") $("counter").textContent = "practice " + tr.number + " / " + ST.trials.filter(t => t.phase === "practice").length;
+  else { const n = ST.trials.filter(t => t.block === tr.block && t.phase !== "practice").length; $("counter").textContent = "part " + tr.block + " of " + (RUN === "pilot" ? 1 : 4) + " · " + tr.inBlock + " / " + n; }
+  setPrompt("iti"); paintScene(0, true);
+  ctxCanvas = document.createElement("canvas"); ctxCanvas.width = cv.width; ctxCanvas.height = cv.height;
+  const oc = ctxCanvas.getContext("2d"), k = cv.width / m.scene_w_px; oc.setTransform(k, 0, 0, k, 0, 0);
+  drawContext(oc, m.u, cuesOf(tr.combo));
+  const mine = T;
+  setTimeout(() => {
+    if (T !== mine) return;
+    paintScene(T.steps * STEP_PCT, false); setPrompt("judge");
+    requestAnimationFrame(() => { if (T !== mine) return; T.onset = performance.now(); T.phase = "judge"; });
+  }, ITI_MS);
+}
+function judge(same){
+  if (!T || T.phase !== "judge") return;
+  const now = performance.now(); if (now - T.onset < MIN_JUDGE_MS) return;
+  T.same = same ? 1 : 0; T.rtJ = now - T.onset; T.adjOn = now; T.phase = "adjust"; setPrompt("adjust");
+}
+function step(dir){
+  if (!T || T.phase !== "adjust") return;
+  const ns = Math.max(MIN_PCT / STEP_PCT, Math.min(MAX_PCT / STEP_PCT, T.steps + dir));
+  if (ns === T.steps) return;
+  T.steps = ns; T.nSteps++; if (T.lastDir && dir !== T.lastDir) T.nRev++; T.lastDir = dir;
+  paintScene(T.steps * STEP_PCT, false);
+}
+function confirmTrial(){
+  if (!T || T.phase !== "adjust") return;
+  const now = performance.now(); if (now - T.adjOn < MIN_CONFIRM_MS) return;
+  const m = ST.meta, tr = T.tr, q = cuesOf(tr.combo), top = G.L0 * m.u, fin = T.steps * STEP_PCT;
+  const row = { session_id:ST.sessionId, participant_code:ST.code, run_type:RUN, mode:MODE, seq:tr.seq, phase:tr.phase,
+    trial_number:tr.number, block:tr.block, trial_in_block:tr.inBlock, condition_code:codeOf(tr.combo),
+    cue_lines:+q.lines, cue_horizon:+q.horizon, cue_shade:+q.shade, cue_texture:+q.texture, cue_trees:+q.trees,
+    n_cues:CUES.reduce((n, c) => n + (q[c.key] ? 1 : 0), 0), start_offset_pct:tr.start, judged_same:T.same,
+    rt_judgement_ms:Math.round(T.rtJ), final_offset_pct:fin, adjusted:fin !== tr.start ? 1 : 0, n_steps:T.nSteps,
+    n_reversals:T.nRev, rt_adjust_ms:Math.round(now - T.adjOn),
+    catch_pass:tr.phase === "catch" ? ((T.same === 0 && Math.abs(fin) <= CATCH_PASS_LIMIT) ? 1 : 0) : "",
+    top_length_px:+top.toFixed(2), final_length_px:+(top * (1 + fin / 100)).toFixed(2),
+    focus_lost:T.focusLost ? 1 : 0, tab_hidden:T.hidden ? 1 : 0, window_changed:T.resized ? 1 : 0,
+    fullscreen:isFullscreen() ? 1 : 0, window_w:window.innerWidth, window_h:window.innerHeight,
+    completed_iso:nowIso(), app_version:VERSION };
+  T.phase = "done";
+  ST.results.push(row); ST.pending.push(row);
+  const next = ST.trials[ST.results.length];
+  if (ST.pending.length >= CFG.flushEvery || !next || next.block !== tr.block) enqueue(); else save();
+  startNext();
+}
+function trialsFinished(){
+  T = null; ST.trialsDone = true; ST.meta.status = "trials_done"; ST.stage = "post";
+  enqueue(); openPost();
+}
+function openPost(){ show("sPost"); try { if (document.fullscreenElement) document.exitFullscreen(); } catch (e) {} }
+function postNext(){
+  const ans = {attentive:radio("care"), used_tools:radio("tools"), moved:radio("moved"), knew_ponzo:radio("knew"), use_data:radio("use")};
+  if (Object.values(ans).some(v => !v)){ $("postMsg").textContent = "Please answer every question (the comment box is optional)."; return; }
+  Object.assign(ST.meta, ans, {comments:$("qComments").value.trim().slice(0, 500)});
+  ST.meta.attentive = +ST.meta.attentive;
+  const end = nowIso();
+  Object.assign(ST.meta, {status:"complete", completed_iso:end, duration_min:+((Date.parse(end) - Date.parse(ST.meta.started_iso)) / 60000).toFixed(1)});
+  ST.finished = true; ST.stage = "done";
+  enqueue();
+  if (MODE === "online") store.set(DONE_KEY, {code:ST.code, at:end});
+  openDone();
+}
+
+/* ---------- the end: confirm the data arrived ---------- */
+function renderSave(){
+  if (!ST || $("sDone").hidden) return;
+  const st = $("saveStatus"), fail = $("saveFail"), help = $("saveFailHelp");
+  if (!ENDPOINT_OK){ st.className = "warn"; st.textContent = "Test mode: nothing was sent. Download the data to check it."; fail.hidden = false; $("retryBtn").hidden = true; help.hidden = true; return; }
+  if (!ST.queue.length){ st.className = "ok"; st.textContent = ST.meta.send_mode === "no-cors" ? "Your answers have been sent." : "Your answers have been saved."; fail.hidden = true; help.hidden = true; return; }
+  if (ST.sendError || ST.giveUp){
+    st.className = "warn"; st.textContent = "Your answers could not be sent" + (ST.sendError ? " (" + ST.sendError + ")" : "") + ".";
+    fail.hidden = false; $("retryBtn").hidden = false; help.hidden = false;
+    help.textContent = "Please press “Try sending again”. If it still fails, download your data and email the file" + (CFG.contactEmail ? " to " + CFG.contactEmail : " to the research team") + ". Thank you!";
+    return;
+  }
+  st.className = "muted"; st.textContent = "Saving your answers… please keep this page open for a moment.";
+  fail.hidden = true; help.hidden = true;
+}
+function openDone(){
+  $("doneCode").textContent = ST.code;
+  $("doneContact").textContent = CFG.contactEmail ? "Questions or data deletion: " + CFG.contactEmail + "." : "";
+  $("labNext").hidden = MODE !== "lab";
+  show("sDone"); renderSave(); pump();
+  setTimeout(() => { if (ST && ST.queue.length){ ST.giveUp = true; renderSave(); } }, 45000);
+}
+function downloadData(){
+  const rows = ST.results.map(r => Object.assign({}, sessionRow(), r));
+  const cols = [...new Set([...SESSION_COLS, ...TRIAL_COLS])];
+  const csv = [cols.join(",")].concat(rows.map(r => cols.map(c => csvCell(r[c])).join(","))).join("\r\n") + "\r\n";
+  const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([csv], {type:"text/csv"}));
+  a.download = "ponzo_" + ST.code + ".csv"; document.body.appendChild(a); a.click(); a.remove();
+}
+
+/* ---------- input ---------- */
+document.addEventListener("keydown", e => {
+  if (!$("sDist").hidden && (e.key === " " || e.code === "Space")){ e.preventDefault(); if (!e.repeat) bsHit(); return; }
+  if (!$("sGate").hidden && (e.key === " " || e.key === "Enter") && !e.repeat){ e.preventDefault(); closeGate(); return; }
+  if (!T || $("stage").hidden) return;
+  const k = e.key;
+  if (T.phase === "judge"){
+    if (e.repeat) return;
+    if (k === "s" || k === "S"){ e.preventDefault(); judge(true); }
+    else if (k === "d" || k === "D"){ e.preventDefault(); judge(false); }
+  } else if (T.phase === "adjust"){
+    if (k === "ArrowLeft"){ e.preventDefault(); step(-1); }
+    else if (k === "ArrowRight"){ e.preventDefault(); step(1); }
+    else if (k === "Enter"){ e.preventDefault(); if (!e.repeat) confirmTrial(); }
+  }
+});
+function holdButton(id, dir){
+  let t1 = null, t2 = null; const stop = () => { clearTimeout(t1); clearInterval(t2); t1 = t2 = null; };
+  const b = $(id);
+  b.addEventListener("pointerdown", e => { e.preventDefault(); stop(); step(dir); t1 = setTimeout(() => { t2 = setInterval(() => step(dir), 60); }, 350); });
+  ["pointerup", "pointerleave", "pointercancel"].forEach(ev => b.addEventListener(ev, stop));
+}
+window.addEventListener("blur", () => { if (T && (T.phase === "judge" || T.phase === "adjust")) T.focusLost = true; });
+document.addEventListener("visibilitychange", () => {
+  if (document.hidden && ST && ST.stage === "trials"){ ST.meta.tab_hidden_total = (ST.meta.tab_hidden_total || 0) + 1; if (T && T.phase !== "done") T.hidden = true; save(); }
+});
+window.addEventListener("resize", () => {
+  if (!T || !ST) return;
+  const fits = fitsWindow(ST.meta.scene_w_px, ST.meta.scene_h_px);
+  if (T.phase === "wait"){ if (fits) runTrial(T.tr, true); }
+  else if (T.phase === "iti" || T.phase === "judge" || T.phase === "adjust"){
+    if (!fits) runTrial(T.tr);
+    else if (T.phase !== "iti") T.resized = true;
+  }
+});
+window.addEventListener("online", pump);
+
+/* ---------- start ---------- */
+function init(){
+  $("testBanner").hidden = ENDPOINT_OK;
+  initWelcome();
+  $("welcomeBtn").addEventListener("click", () => { ST.stage = "about"; save(); show("sAbout"); });
+  $("aboutBtn").addEventListener("click", aboutNext);
+  $("ppmRange").addEventListener("input", () => setCard(+$("ppmRange").value));
+  $("calibBtn").addEventListener("click", calibNext);
+  $("bsStartBtn").addEventListener("click", () => { $("bsStartBtn").blur(); bsRep(); });
+  $("bsSkip").addEventListener("click", () => { BS.running = false; setDistance(CFG.assumedDistanceCm * 10, "assumed_skipped", NaN); });
+  $("distBtn").addEventListener("click", () => { ST.stage = "instr"; save(); show("sInstr"); });
+  $("instrBtn").addEventListener("click", () => { goFullscreen(); afterFullscreen(beginTask); });
+  $("gateBtn").addEventListener("click", closeGate);
+  $("sameBtn").addEventListener("click", () => judge(true)); $("diffBtn").addEventListener("click", () => judge(false));
+  holdButton("shorterBtn", -1); holdButton("longerBtn", 1);
+  $("okBtn").addEventListener("click", confirmTrial);
+  $("fsBtn2").addEventListener("click", goFullscreen);
+  $("postBtn").addEventListener("click", postNext);
+  $("retryBtn").addEventListener("click", () => { ST.sendError = ""; ST.giveUp = false; failStreak = 0; renderSave(); pump(); setTimeout(() => { if (ST.queue.length){ ST.giveUp = true; renderSave(); } }, 45000); });
+  $("dlBtn").addEventListener("click", downloadData);
+  $("nextBtn").addEventListener("click", () => { store.del(KEY); location.reload(); });
+  $("resumeBtn").addEventListener("click", () => {
+    goFullscreen(); ST.meta.resumed = (ST.meta.resumed || 0) + 1; save();
+    if (ST.stage === "post") openPost(); else { ST.gateAt = -1; setTimeout(() => openGate("resume"), 300); }
+  });
+
+  if (!CFG.collectionOpen){ blocked("This study has closed", "Data collection has ended. Thank you for your interest!"); return; }
+  const touchOnly = window.matchMedia && matchMedia("(pointer: coarse)").matches && !matchMedia("(pointer: fine)").matches;
+  if (touchOnly || Math.max(screen.width, screen.height) < 900){
+    blocked("Please use a computer", "This study needs a laptop or desktop computer with a keyboard and a larger screen. Please open this link there. Thank you!"); return;
+  }
+  const old = store.get(KEY);
+  if (old && old.sessionId && Date.now() - (old.lastActive || 0) < 6 * 3600 * 1000){
+    if (old.finished){ ST = old; openDone(); return; }
+    if (old.stage === "trials" || old.stage === "post"){
+      ST = old;
+      $("resumeText").textContent = "You stopped part-way through. Your answers so far are kept: continue from where you left off.";
+      show("sResume"); pump(); return;
+    }
+  }
+  if (MODE === "online"){
+    const done = store.get(DONE_KEY);
+    if (done && done.code){ blocked("You have already taken part", "This browser has already completed the study. Each person can take part only once. Thank you!", done.code); return; }
+  }
+  ST = newState(); save(); show("sWelcome");
+}
+if (typeof document !== "undefined") init();
+</script>
+</body>
+</html>

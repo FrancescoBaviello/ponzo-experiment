@@ -9,7 +9,7 @@ Google Sheet that only the research group can see.
 | `config.js` | Script address, study token, contact email, open/closed switch | Yes |
 | `Code.gs` | The Google Apps Script that receives the data | Only the `STUDY_TOKEN` line |
 
-Setup takes about 30 minutes: follow the setup guide step by step (Sheet + script, GitHub Pages, connect, pilot test).
+Test takes about 30 minutes: follow the setup guide step by step (Sheet + script, GitHub Pages, connect, pilot test).
 
 Link options:
 
